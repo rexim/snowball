@@ -1,3 +1,4 @@
+#include <assert.h>  /* for assert */
 #include <ctype.h>   /* for toupper etc */
 #include <stdio.h>   /* for fprintf etc */
 #include <stdlib.h>  /* for free etc */
@@ -35,6 +36,9 @@ static void print_arglist(int exit_code) {
                "  -o[utput] file\n"
                "  -s[yntax]\n"
                "  -comments\n"
+#ifndef DISABLE_INTERPRET
+               "  -int[erpret]\n"
+#endif
 #ifndef DISABLE_JAVA
                "  -j[ava]\n"
 #endif
@@ -174,6 +178,12 @@ static int read_options(struct options * o, int argc, char * argv[]) {
 #ifndef DISABLE_GO
             if (eq(s, "-go")) {
                 o->make_lang = LANG_GO;
+                continue;
+            }
+#endif
+#ifndef DISABLE_INTERPRET
+            if (eq(s, "-int") || eq(s, "-interpret")) {
+                o->make_lang = LANG_INTERPRET;
                 continue;
             }
 #endif
@@ -511,6 +521,11 @@ extern int main(int argc, char * argv[]) {
                     fclose(o->output_src);
                     fclose(o->output_h);
                 }
+#ifndef DISABLE_INTERPRET
+                if (o->make_lang == LANG_INTERPRET) {
+                    interpret(g);
+                }
+#endif
 #ifndef DISABLE_JAVA
                 if (o->make_lang == LANG_JAVA) {
                     symbol * b = add_s_to_b(0, s);

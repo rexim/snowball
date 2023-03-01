@@ -344,7 +344,7 @@ struct options {
     byte syntax_tree;
     byte comments;
     enc encoding;
-    enum { LANG_JAVA, LANG_C, LANG_CPLUSPLUS, LANG_CSHARP, LANG_PASCAL, LANG_PYTHON, LANG_JAVASCRIPT, LANG_RUST, LANG_GO, LANG_ADA } make_lang;
+    enum { LANG_JAVA, LANG_C, LANG_CPLUSPLUS, LANG_CSHARP, LANG_PASCAL, LANG_PYTHON, LANG_JAVASCRIPT, LANG_RUST, LANG_GO, LANG_ADA, LANG_INTERPRET } make_lang;
     const char * externals_prefix;
     const char * variables_prefix;
     const char * runtime_path;
@@ -381,6 +381,10 @@ extern int repeat_restore(struct generator * g, struct node * p);
 
 /* Generator for C code. */
 extern void generate_program_c(struct generator * g);
+
+#ifndef DISABLE_INTERPRET
+extern void interpret(struct generator *g);
+#endif
 
 #ifndef DISABLE_JAVA
 /* Generator for Java code. */
