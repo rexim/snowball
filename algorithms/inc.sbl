@@ -1,0 +1,7 @@
+// Algorithm that increments a binary string
+externals ( stem )
+
+define stem as (
+  (['0'] <- '1') or
+  (repeat (['1'] <- '0') (['0'] <- '1'))
+)

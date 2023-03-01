@@ -1,0 +1,7 @@
+// Algorithm that negates a binary string
+externals ( stem )
+
+define stem as repeat (
+  (['0'] <- '1') or
+  (['1'] <- '0')
+)
