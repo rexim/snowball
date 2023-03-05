@@ -14,8 +14,10 @@ typedef unsigned short symbol;
 #define NEW(type, p) struct type * p = (struct type *) MALLOC(sizeof(struct type))
 #define NEWVEC(type, p, n) struct type * p = (struct type *) MALLOC(sizeof(struct type) * (n))
 
-#define SIZE(p)     ((int *)(p))[-1]
-#define CAPACITY(p) ((int *)(p))[-2]
+#define SIZE(p)        ((int *)(p))[-1]
+#define SET_SIZE(p, n) ((int *)(p))[-1] = n
+#define CAPACITY(p)    ((int *)(p))[-2]
+#define HEAD 2*sizeof(int)
 
 extern symbol * create_b(int n);
 extern void report_b(FILE * out, const symbol * p);
@@ -383,7 +385,11 @@ extern int repeat_restore(struct generator * g, struct node * p);
 extern void generate_program_c(struct generator * g);
 
 #ifndef DISABLE_INTERPRET
-extern void interpret(struct generator *g);
+struct SN_env {
+    symbol * p;
+    int c, l, bra, ket;
+};
+extern void interpret(struct generator *g, struct SN_env *e);
 #endif
 
 #ifndef DISABLE_JAVA
