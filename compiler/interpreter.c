@@ -286,6 +286,7 @@ static int interpret_node(struct generator *g, struct SN_env *z, struct node *p)
     fprintf(stderr, "%s:%d: %s is not interpreted yet\n",
             g->analyser->tokeniser->file,
             p->line_number, printable_type_of_node(p->type));
+    fprintf(stderr, "%s:%d: add another switch-case up there\n", __FILE__, __LINE__);
     exit(1);
     return 0;
 }
@@ -294,14 +295,9 @@ extern void interpret(struct generator *g, struct SN_env *z)
 {
     struct name *stem = find_stem(g);
     if (stem == NULL) {
-        fprintf(stderr, "ERROR: Could not find an external `stem`\n");
+        fprintf(stderr, "ERROR: Could not find an external called `stem`\n");
         exit(1);
     }
 
     interpret_node(g, z, stem->definition);
-
-    printf("%s:%d: `stem` declared in here\n", g->analyser->tokeniser->file, stem->declaration_line_number);
-    struct node *def = stem->definition;
-    printf("%s:%d: `stem` defined in here\n", g->analyser->tokeniser->file, def->line_number);
-
 }
