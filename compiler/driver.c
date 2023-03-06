@@ -523,13 +523,15 @@ extern int main(int argc, char * argv[]) {
                 }
 #ifndef DISABLE_INTERPRET
                 if (o->make_lang == LANG_INTERPRET) {
-                    struct SN_env z = {0};
+                    struct SN_env *z = SN_create_env(g);
+                    if (z == NULL) return 1;
                     const char *input = "110110011";
-                    z.p = add_s_to_b(z.p, input);
-                    z.l = SIZE(z.p);
-                    interpret(g, &z);
+                    z->p = add_s_to_b(z->p, input);
+                    z->l = SIZE(z->p);
+                    interpret(g, z);
                     printf("INPUT:  %s\n", input);
-                    printf("OUTPUT: %s\n", b_to_s(z.p));
+                    printf("OUTPUT: %s\n", b_to_s(z->p));
+                    SN_close_env(z, g);
                 }
 #endif
 #ifndef DISABLE_JAVA

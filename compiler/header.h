@@ -388,8 +388,12 @@ extern void generate_program_c(struct generator * g);
 struct SN_env {
     symbol * p;
     int c, l, bra, ket;
+    symbol * * S;
+    int * I;
 };
-extern void interpret(struct generator *g, struct SN_env *e);
+extern struct SN_env *SN_create_env(struct generator *g);
+extern void SN_close_env(struct SN_env *z, struct generator *g);
+extern void interpret(struct generator *g, struct SN_env *z);
 #endif
 
 #ifndef DISABLE_JAVA

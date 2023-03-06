@@ -206,6 +206,22 @@ static int slice_from_v(struct SN_env * z, const symbol * p) {
     return slice_from_s(z, SIZE(p), p);
 }
 
+static int interpret_AE(struct generator *g, struct node *p)
+{
+    switch (p->type) {
+    case c_number: {
+        return p->number;
+    } break;
+    }
+
+    fprintf(stderr, "%s:%d: AE %s is not interpreted yet\n",
+            g->analyser->tokeniser->file,
+            p->line_number, printable_type_of_node(p->type));
+    fprintf(stderr, "%s:%d: add another switch-case up there\n", __FILE__, __LINE__);
+    exit(1);
+    return 0;
+}
+
 static int interpret_node(struct generator *g, struct SN_env *z, struct node *p)
 {
     switch (p->type) {
@@ -281,14 +297,95 @@ static int interpret_node(struct generator *g, struct SN_env *z, struct node *p)
         slice_from_v(z, p->literalstring);
         return 1;
     } break;
+
+    case c_true: {
+        return 1;
+    } break;
+
+    case c_false: {
+        return 0;
+    } break;
+
+    case c_mathassign: {
+        switch (p->name->type) {
+        case t_integer: {
+            int count = p->name->count;
+            if (count < 0) {
+                fprintf(stderr, "Reference to optimised out variable ");
+                report_b(stderr, p->name->b);
+                fprintf(stderr, " attempted\n");
+                exit(1);
+            }
+            z->I[count] = interpret_AE(g, p->AE);
+        } break;
+
+        default: assert(0 && "TODO: assigning this kind of variables is not implemented yet");
+        }
+
+        return 1;
+    } break;
     }
 
-    fprintf(stderr, "%s:%d: %s is not interpreted yet\n",
+    fprintf(stderr, "%s:%d: command %s is not interpreted yet\n",
             g->analyser->tokeniser->file,
             p->line_number, printable_type_of_node(p->type));
     fprintf(stderr, "%s:%d: add another switch-case up there\n", __FILE__, __LINE__);
     exit(1);
     return 0;
+}
+
+extern struct SN_env *SN_create_env(struct generator *g)
+{
+    int * p = g->analyser->name_count;
+    int S_size = p[t_string];
+    int I_size = p[t_integer] + p[t_boolean];
+
+    struct SN_env * z = (struct SN_env *) calloc(1, sizeof(struct SN_env));
+    if (z == NULL) return NULL;
+    z->p = create_b(0);
+    if (z->p == NULL) goto error;
+    if (S_size)
+    {
+        int i;
+        z->S = (symbol * *) calloc(S_size, sizeof(symbol *));
+        if (z->S == NULL) goto error;
+
+        for (i = 0; i < S_size; i++)
+        {
+            z->S[i] = create_b(0);
+            if (z->S[i] == NULL) goto error;
+        }
+    }
+
+    if (I_size)
+    {
+        z->I = (int *) calloc(I_size, sizeof(int));
+        if (z->I == NULL) goto error;
+    }
+
+    return z;
+error:
+    SN_close_env(z, g);
+    return NULL;
+}
+
+extern void SN_close_env(struct SN_env *z, struct generator *g)
+{
+    int * p = g->analyser->name_count;
+    int S_size = p[t_string];
+    if (z == NULL) return;
+    if (S_size)
+    {
+        int i;
+        for (i = 0; i < S_size; i++)
+        {
+            lose_b(z->S[i]);
+        }
+        free(z->S);
+    }
+    free(z->I);
+    if (z->p) lose_b(z->p);
+    free(z);
 }
 
 extern void interpret(struct generator *g, struct SN_env *z)
