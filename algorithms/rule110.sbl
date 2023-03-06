@@ -1,0 +1,23 @@
+externals ( stem )
+integers ( x )
+routines ( zero one )
+
+define zero as (
+  (['0'] ('0' and (<- '0' $x = 0))) or
+  (['0'] ('1' and (<- '1' $x = 0))) or
+  (['1'] ('0' and (<- '1' $x = 1))) or
+  (['1'] ('1' and (<- '1' $x = 1)))
+)
+define one as (
+  (['0'] ('0' and (<- '0' $x = 0))) or
+  (['0'] ('1' and (<- '1' $x = 0))) or
+  (['1'] ('0' and (<- '1' $x = 1))) or
+  (['1'] ('1' and (<- '0' $x = 1)))
+)
+
+define stem as (
+  ('0' $x = 0) or ('1' $x = 1)
+  repeat (
+    ($x == 0 zero) or ($x == 1 one)
+  )
+)
