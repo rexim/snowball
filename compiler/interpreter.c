@@ -206,11 +206,28 @@ static int slice_from_v(struct SN_env * z, const symbol * p) {
     return slice_from_s(z, SIZE(p), p);
 }
 
-static int interpret_AE(struct generator *g, struct node *p)
+static int interpret_AE(struct generator *g, struct SN_env *z, struct node *p)
 {
     switch (p->type) {
     case c_number: {
         return p->number;
+    } break;
+
+    case c_name: {
+        switch (p->name->type) {
+        case t_integer: {
+            int count = p->name->count;
+            if (count < 0) {
+                fprintf(stderr, "Reference to optimised out variable ");
+                report_b(stderr, p->name->b);
+                fprintf(stderr, " attempted\n");
+                exit(1);
+            }
+            return z->I[count];
+        } break;
+
+        default: assert(0 && "TODO: evaluting this kind of variables is not implemented yet");
+        }
     } break;
     }
 
@@ -316,13 +333,17 @@ static int interpret_node(struct generator *g, struct SN_env *z, struct node *p)
                 fprintf(stderr, " attempted\n");
                 exit(1);
             }
-            z->I[count] = interpret_AE(g, p->AE);
+            z->I[count] = interpret_AE(g, z, p->AE);
         } break;
 
         default: assert(0 && "TODO: assigning this kind of variables is not implemented yet");
         }
 
         return 1;
+    } break;
+
+    case c_eq: {
+        return interpret_AE(g, z, p->left) == interpret_AE(g, z, p->AE);
     } break;
     }
 
