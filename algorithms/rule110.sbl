@@ -2,6 +2,7 @@ externals ( stem )
 integers ( x )
 routines ( zero one )
 
+// TODO: last bit is basically not handled at all
 define zero as (
   (['0'] ('0' and (<- '0' $x = 0))) or
   (['0'] ('1' and (<- '1' $x = 0))) or
@@ -16,6 +17,7 @@ define one as (
 )
 
 define stem as (
+  // TODO: It would be better to handle the first 3 bits as if there is permanent 0 before the first one.
   ('0' $x = 0) or ('1' $x = 1)
   repeat (
     ($x == 0 zero) or ($x == 1 one)
