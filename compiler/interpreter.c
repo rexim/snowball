@@ -239,13 +239,13 @@ static int interpret_AE(struct generator *g, struct SN_env *z, struct node *p)
     return 0;
 }
 
-static int interpret_node(struct generator *g, struct SN_env *z, struct node *p)
+static int interpret_command(struct generator *g, struct SN_env *z, struct node *p)
 {
     switch (p->type) {
     case c_repeat: {
         while (1) {
             int c = z->c;
-            int s = interpret_node(g, z, p->left);
+            int s = interpret_command(g, z, p->left);
             if (!s) {
                 z->c = c;
                 return 1;
@@ -259,7 +259,7 @@ static int interpret_node(struct generator *g, struct SN_env *z, struct node *p)
         p = p->left;
         while (p) {
             int c = z->c;
-            int s = interpret_node(g, z, p);
+            int s = interpret_command(g, z, p);
             if (s) return 1;
             z->c = c;
             p = p->right;
@@ -272,7 +272,7 @@ static int interpret_node(struct generator *g, struct SN_env *z, struct node *p)
         p = p->left;
         while (p) {
             int c = z->c;
-            int s = interpret_node(g, z, p);
+            int s = interpret_command(g, z, p);
             if (!s) return 0;
             z->c = c;
             p = p->right;
@@ -284,7 +284,7 @@ static int interpret_node(struct generator *g, struct SN_env *z, struct node *p)
     case c_bra: {
         p = p->left;
         while (p) {
-            int s = interpret_node(g, z, p);
+            int s = interpret_command(g, z, p);
             if (!s) return 0;
             p = p->right;
         }
@@ -344,6 +344,10 @@ static int interpret_node(struct generator *g, struct SN_env *z, struct node *p)
 
     case c_eq: {
         return interpret_AE(g, z, p->left) == interpret_AE(g, z, p->AE);
+    } break;
+
+    case c_call: {
+        return interpret_command(g, z, p->name->definition);
     } break;
     }
 
@@ -417,5 +421,5 @@ extern void interpret(struct generator *g, struct SN_env *z)
         exit(1);
     }
 
-    interpret_node(g, z, stem->definition);
+    interpret_command(g, z, stem->definition);
 }

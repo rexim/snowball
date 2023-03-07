@@ -525,12 +525,17 @@ extern int main(int argc, char * argv[]) {
                 if (o->make_lang == LANG_INTERPRET) {
                     struct SN_env *z = SN_create_env(g);
                     if (z == NULL) return 1;
-                    const char *input = "110110011";
-                    z->p = add_s_to_b(z->p, input);
-                    z->l = SIZE(z->p);
-                    interpret(g, z);
+                    // const char *input = "110110011";
+                    const char *input = "000000001";
                     printf("INPUT:  %s\n", input);
-                    printf("OUTPUT: %s\n", b_to_s(z->p));
+                    z->p = add_s_to_b(z->p, input);
+                    // TODO: customizable amount of iterations
+                    for (size_t i = 0; i < 1; ++i) {
+                        z->c = 0;
+                        z->l = SIZE(z->p);
+                        interpret(g, z);
+                        printf("OUTPUT: %s\n", b_to_s(z->p));
+                    }
                     SN_close_env(z, g);
                 }
 #endif
