@@ -122,6 +122,24 @@ static const char *printable_type_of_node(int type)
     return "<unknown>";
 }
 
+#define tracef_linenumber(g, p, ...) \
+    do { \
+        fprintf(stderr, "%s:%d: ", (g)->analyser->tokeniser->file, (p)->line_number); \
+        fprintf(stderr, __VA_ARGS__); \
+    } while (0)
+
+#define tracef_node(g, p, ...) \
+    do { \
+        tracef_linenumber((g), (p), "%s: ", printable_type_of_node((p)->type)); \
+        fprintf(stderr, __VA_ARGS__); \
+    } while (0)
+
+#define tracef_here(...) \
+    do { \
+        fprintf(stderr, "%s:%d: ", __FILE__, __LINE__); \
+        fprintf(stderr, __VA_ARGS__); \
+    } while (0)
+
 static int eq_s(struct SN_env * z, int s_size, const symbol * s) {
     if (z->l - z->c < s_size || memcmp(z->p + z->c, s, s_size * sizeof(symbol)) != 0) return 0;
     z->c += s_size; return 1;
@@ -231,10 +249,8 @@ static int interpret_AE(struct generator *g, struct SN_env *z, struct node *p)
     } break;
     }
 
-    fprintf(stderr, "%s:%d: AE %s is not interpreted yet\n",
-            g->analyser->tokeniser->file,
-            p->line_number, printable_type_of_node(p->type));
-    fprintf(stderr, "%s:%d: add another switch-case up there\n", __FILE__, __LINE__);
+    tracef_node(g, p, "AE is not interpreted yet\n");
+    tracef_here("add another switch-case up there\n");
     exit(1);
     return 0;
 }
@@ -349,12 +365,28 @@ static int interpret_command(struct generator *g, struct SN_env *z, struct node 
     case c_call: {
         return interpret_command(g, z, p->name->definition);
     } break;
+
+    case c_substring: {
+        assert(p->mode == m_forward && "TODO: only forward mode is supported for now");
+        struct among * x = p->among;
+        printf("Amogus commands:\n");
+        for (int i = 0; i < x->command_count; ++i) {
+            tracef_node(g, x->commands[i], "command %p\n", x->commands[i]->literalstring);
+        }
+        printf("Amongus cases:\n");
+        for (int i = 0; i < x->literalstring_count; ++i) {
+            if (x->b[i].action) {
+                tracef_linenumber(g, &x->b[i], "size = %d, action = %s\n", x->b[i].size, printable_type_of_node(x->b[i].action->type));
+            } else {
+                tracef_linenumber(g, &x->b[i], "size = %d\n", x->b[i].size);
+            }
+        }
+        assert(0 && "TODO: c_substring implementation");
+    } break;
     }
 
-    fprintf(stderr, "%s:%d: command %s is not interpreted yet\n",
-            g->analyser->tokeniser->file,
-            p->line_number, printable_type_of_node(p->type));
-    fprintf(stderr, "%s:%d: add another switch-case up there\n", __FILE__, __LINE__);
+    tracef_node(g, p, "command is not interpreted yet\n");
+    tracef_here("add another switch-case up there\n");
     exit(1);
     return 0;
 }
