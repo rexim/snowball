@@ -1,7 +1,8 @@
-#include <stdlib.h> /* for free */
-#include <stdio.h>  /* for printf */
-#include <assert.h> /* for assert */
-#include <string.h> /* for strcmp */
+#include <limits.h>  /* for INT_MAX */
+#include <stdlib.h>  /* for free */
+#include <stdio.h>   /* for printf */
+#include <assert.h>  /* for assert */
+#include <string.h>  /* for strcmp */
 #include "header.h"
 
 struct system_word {
@@ -321,6 +322,8 @@ static int interpret_command(struct generator *g, struct SN_env *z, struct node 
     } break;
 
     case c_literalstring: {
+        // TODO: in the generator there is also case when SIZE(b) == 1 for optimization reasons
+        // Should we do the same in here too?
         symbol * b = p->literalstring;
         return eq_s(z, SIZE(b), b);
     } break;
@@ -368,19 +371,75 @@ static int interpret_command(struct generator *g, struct SN_env *z, struct node 
 
     case c_substring: {
         assert(p->mode == m_forward && "TODO: only forward mode is supported for now");
+
+        // START COPY PASTE from generator.c //////////////////////////////
         struct among * x = p->among;
-        printf("Amogus commands:\n");
-        for (int i = 0; i < x->command_count; ++i) {
-            tracef_node(g, x->commands[i], "command %p\n", x->commands[i]->literalstring);
-        }
-        printf("Amongus cases:\n");
-        for (int i = 0; i < x->literalstring_count; ++i) {
-            if (x->b[i].action) {
-                tracef_linenumber(g, &x->b[i], "size = %d, action = %s\n", x->b[i].size, printable_type_of_node(x->b[i].action->type));
-            } else {
-                tracef_linenumber(g, &x->b[i], "size = %d\n", x->b[i].size);
+        int block = -1;
+        unsigned int bitmap = 0;
+        struct amongvec * among_cases = x->b;
+        int c;
+        int empty_case = -1;
+        int n_cases = 0;
+        symbol cases[2];
+        int shortest_size = INT_MAX;
+
+        // TODO: I wonder if doing all of this on each amogus case is a good idea.
+        // Since it's a copy-paste from generator.c it's all was suppose to happen
+        // once at compile time.
+
+        /* In forward mode with non-ASCII UTF-8 characters, the first byte
+         * of the string will often be the same, so instead look at the last
+         * common byte position.
+         *
+         * In backward mode, we can't match if there are fewer characters before
+         * the current position than the minimum length.
+         */
+        for (c = 0; c < x->literalstring_count; ++c) {
+            int size = among_cases[c].size;
+            if (size != 0 && size < shortest_size) {
+                shortest_size = size;
             }
         }
+
+        for (c = 0; c < x->literalstring_count; ++c) {
+            symbol ch;
+            if (among_cases[c].size == 0) {
+                empty_case = c;
+                continue;
+            }
+            if (p->mode == m_forward) {
+                ch = among_cases[c].b[shortest_size - 1];
+            } else {
+                ch = among_cases[c].b[among_cases[c].size - 1];
+            }
+            if (n_cases == 0) {
+                block = ch >> 5;
+            } else if (ch >> 5 != block) {
+                block = -1;
+                if (n_cases > 2) break;
+            }
+            if (block == -1) {
+                if (n_cases > 0 && ch == cases[0]) continue;
+                if (n_cases < 2) {
+                    cases[n_cases++] = ch;
+                } else if (ch != cases[1]) {
+                    ++n_cases;
+                    break;
+                }
+            } else {
+                if ((bitmap & (1u << (ch & 0x1f))) == 0) {
+                    bitmap |= 1u << (ch & 0x1f);
+                    if (n_cases < 2)
+                    cases[n_cases] = ch;
+                    ++n_cases;
+                }
+            }
+        }
+        // END COPY PASTE from generator.c //////////////////////////////
+
+        // TODO: all of the copy-pasted stuff above looks like some sort of optimization
+        // Can we avoid it for now for the sake of simplier implementation?
+
         assert(0 && "TODO: c_substring implementation");
     } break;
     }
