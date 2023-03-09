@@ -439,9 +439,10 @@ static int interpret_command(struct generator *g, struct SN_env *z, struct node 
         assert(p->mode == m_forward && "TODO: only forward mode is supported for now");
         // TODO: The original generate_substring() had some sort of optimization. Is it applicable here?
         struct among * x = p->among;
-        int amongvar = find_among(z, x->b, x->literalstring_count);
-        //assert(!x->amongvar_needed && "TODO: the value of amongvar needs to be passed down to c_among somehow. Maybe via the environment SN_env?");
-        return amongvar;
+        int among_var = find_among(z, x->b, x->literalstring_count);
+        // TODO: I'm not sure if this is the best solution since I have a limited understand of how amogus works
+        if (x->amongvar_needed) z->among_var = among_var;
+        return among_var;
     } break;
 
     case c_among: {
@@ -460,16 +461,8 @@ static int interpret_command(struct generator *g, struct SN_env *z, struct node 
             //generate(g, x->commands[0]);
         } else if (x->command_count > 0) {
             assert(x->amongvar_needed);
-            assert(0 && "TODO: we need to pass the value of amongvar from c_substring above somehow. Maybe via the environment SN_env?");
-            // int i;
-            // writef(g, "~Mswitch (among_var) {~C~+", p);
-            // for (i = 1; i <= x->command_count; i++) {
-            //     g->I[0] = i;
-            //     w(g, "~Mcase ~I0:~N~+");
-            //     generate(g, x->commands[i - 1]);
-            //     w(g, "~Mbreak;~N~-");
-            // }
-            // w(g, "~}");
+            assert(z->among_var - 1 < x->command_count);
+            return interpret_command(g, z, x->commands[z->among_var - 1]);
         }
         assert(0 && "TODO: c_among");
     } break;

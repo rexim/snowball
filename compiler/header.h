@@ -390,6 +390,7 @@ struct SN_env {
     int c, l, bra, ket;
     symbol * * S;
     int * I;
+    int among_var;
 };
 extern struct SN_env *SN_create_env(struct generator *g);
 extern void SN_close_env(struct SN_env *z, struct generator *g);

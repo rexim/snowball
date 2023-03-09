@@ -531,7 +531,7 @@ extern int main(int argc, char * argv[]) {
                     printf("INPUT:  %s\n", input);
                     z->p = add_s_to_b(z->p, input);
                     // TODO: customizable amount of iterations
-                    for (size_t i = 0; i < 20; ++i) {
+                    for (size_t i = 0; i < 1; ++i) {
                         z->c = 0;
                         z->l = SIZE(z->p);
                         interpret(g, z);
