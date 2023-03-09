@@ -526,7 +526,8 @@ extern int main(int argc, char * argv[]) {
                     struct SN_env *z = SN_create_env(g);
                     if (z == NULL) return 1;
                     // const char *input = "110110011";
-                    const char *input = "000000000000000000001";
+                    // const char *input = "000000000000000000001";
+                    const char *input = "skis";
                     printf("INPUT:  %s\n", input);
                     z->p = add_s_to_b(z->p, input);
                     // TODO: customizable amount of iterations

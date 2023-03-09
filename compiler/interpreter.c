@@ -225,6 +225,72 @@ static int slice_from_v(struct SN_env * z, const symbol * p) {
     return slice_from_s(z, SIZE(p), p);
 }
 
+static int find_among(struct SN_env * z, const struct amongvec * v, int v_size) {
+
+    int i = 0;
+    int j = v_size;
+
+    int c = z->c; int l = z->l;
+    const symbol * q = z->p + c;
+
+    const struct amongvec * w;
+
+    int common_i = 0;
+    int common_j = 0;
+
+    int first_key_inspected = 0;
+
+    while (1) {
+        int k = i + ((j - i) >> 1);
+        int diff = 0;
+        int common = common_i < common_j ? common_i : common_j; /* smaller */
+        w = v + k;
+        {
+            int i2; for (i2 = common; i2 < w->size; i2++) {
+                if (c + common == l) { diff = -1; break; }
+                diff = q[common] - w->b[i2];
+                if (diff != 0) break;
+                common++;
+            }
+        }
+        if (diff < 0) {
+            j = k;
+            common_j = common;
+        } else {
+            i = k;
+            common_i = common;
+        }
+        if (j - i <= 1) {
+            if (i > 0) break; /* v->s has been inspected */
+            if (j == i) break; /* only one item in v */
+
+            /* - but now we need to go round once more to get
+               v->s inspected. This looks messy, but is actually
+               the optimal approach.  */
+
+            if (first_key_inspected) break;
+            first_key_inspected = 1;
+        }
+    }
+    while (1) {
+        w = v + i;
+        if (common_i >= w->size) {
+            z->c = c + w->size;
+            assert(w->function == 0 && "TODO: we don't really know what this function is used for yet");
+            if (w->function == 0) return w->result;
+#if 0
+            {
+                int res = w->function(z);
+                z->c = c + w->s_size;
+                if (res) return w->result;
+            }
+#endif
+        }
+        i = w->i;
+        if (i < 0) return 0;
+    }
+}
+
 static int interpret_AE(struct generator *g, struct SN_env *z, struct node *p)
 {
     switch (p->type) {
@@ -371,76 +437,46 @@ static int interpret_command(struct generator *g, struct SN_env *z, struct node 
 
     case c_substring: {
         assert(p->mode == m_forward && "TODO: only forward mode is supported for now");
-
-        // START COPY PASTE from generator.c //////////////////////////////
+        // TODO: The original generate_substring() had some sort of optimization. Is it applicable here?
         struct among * x = p->among;
-        int block = -1;
-        unsigned int bitmap = 0;
-        struct amongvec * among_cases = x->b;
-        int c;
-        int empty_case = -1;
-        int n_cases = 0;
-        symbol cases[2];
-        int shortest_size = INT_MAX;
+        int amongvar = find_among(z, x->b, x->literalstring_count);
+        //assert(!x->amongvar_needed && "TODO: the value of amongvar needs to be passed down to c_among somehow. Maybe via the environment SN_env?");
+        return amongvar;
+    } break;
 
-        // TODO: I wonder if doing all of this on each amogus case is a good idea.
-        // Since it's a copy-paste from generator.c it's all was suppose to happen
-        // once at compile time.
-
-        /* In forward mode with non-ASCII UTF-8 characters, the first byte
-         * of the string will often be the same, so instead look at the last
-         * common byte position.
-         *
-         * In backward mode, we can't match if there are fewer characters before
-         * the current position than the minimum length.
-         */
-        for (c = 0; c < x->literalstring_count; ++c) {
-            int size = among_cases[c].size;
-            if (size != 0 && size < shortest_size) {
-                shortest_size = size;
-            }
+    case c_among: {
+        struct among * x = p->among;
+        if (x->substring == 0) {
+            assert(0 && "TODO: interpret_substring()");
+            //generate_substring(g, p);
         }
-
-        for (c = 0; c < x->literalstring_count; ++c) {
-            symbol ch;
-            if (among_cases[c].size == 0) {
-                empty_case = c;
-                continue;
-            }
-            if (p->mode == m_forward) {
-                ch = among_cases[c].b[shortest_size - 1];
-            } else {
-                ch = among_cases[c].b[among_cases[c].size - 1];
-            }
-            if (n_cases == 0) {
-                block = ch >> 5;
-            } else if (ch >> 5 != block) {
-                block = -1;
-                if (n_cases > 2) break;
-            }
-            if (block == -1) {
-                if (n_cases > 0 && ch == cases[0]) continue;
-                if (n_cases < 2) {
-                    cases[n_cases++] = ch;
-                } else if (ch != cases[1]) {
-                    ++n_cases;
-                    break;
-                }
-            } else {
-                if ((bitmap & (1u << (ch & 0x1f))) == 0) {
-                    bitmap |= 1u << (ch & 0x1f);
-                    if (n_cases < 2)
-                    cases[n_cases] = ch;
-                    ++n_cases;
-                }
-            }
+        if (x->starter != 0) {
+            assert(0 && "TODO: interpret(x->starter)");
+            //generate(g, x->starter);
         }
-        // END COPY PASTE from generator.c //////////////////////////////
+        if (x->command_count == 1 && x->nocommand_count == 0) {
+            /* Only one outcome ("no match" already handled). */
+            assert(0 && "TODO: interpret(x->commands[0])");
+            //generate(g, x->commands[0]);
+        } else if (x->command_count > 0) {
+            assert(x->amongvar_needed);
+            assert(0 && "TODO: we need to pass the value of amongvar from c_substring above somehow. Maybe via the environment SN_env?");
+            // int i;
+            // writef(g, "~Mswitch (among_var) {~C~+", p);
+            // for (i = 1; i <= x->command_count; i++) {
+            //     g->I[0] = i;
+            //     w(g, "~Mcase ~I0:~N~+");
+            //     generate(g, x->commands[i - 1]);
+            //     w(g, "~Mbreak;~N~-");
+            // }
+            // w(g, "~}");
+        }
+        assert(0 && "TODO: c_among");
+    } break;
 
-        // TODO: all of the copy-pasted stuff above looks like some sort of optimization
-        // Can we avoid it for now for the sake of simplier implementation?
-
-        assert(0 && "TODO: c_substring implementation");
+    case c_atlimit: {
+        assert(p->mode == m_forward && "TODO: only forward mode i supported for now");
+        return !(z->c < z->l);
     } break;
     }
 
