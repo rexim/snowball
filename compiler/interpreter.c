@@ -468,8 +468,29 @@ static int interpret_command(struct generator *g, struct SN_env *z, struct node 
     } break;
 
     case c_atlimit: {
-        assert(p->mode == m_forward && "TODO: only forward mode i supported for now");
+        assert(p->mode == m_forward && "TODO: only forward mode is supported for now");
         return !(z->c < z->l);
+    } break;
+
+    case c_not: {
+        return !interpret_command(g, z, p->left);
+    } break;
+
+    case c_hop: {
+        assert(p->mode == m_forward && "TODO: only forward mode is supported for now");
+        // Based on the description from manual
+        int ae = interpret_AE(g, z, p->AE);
+        if (ae < 0) return 0;
+        if (z->c + ae > z->l) return 0;
+        z->c += ae;
+        return 1;
+    } break;
+
+    case c_do: {
+        int c = z->c;
+        interpret_command(g, z, p->left);
+        z->c = c;
+        return 1;
     } break;
     }
 

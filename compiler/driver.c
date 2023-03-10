@@ -525,9 +525,17 @@ extern int main(int argc, char * argv[]) {
                 if (o->make_lang == LANG_INTERPRET) {
                     struct SN_env *z = SN_create_env(g);
                     if (z == NULL) return 1;
+
+                    // inv.sbl
                     // const char *input = "110110011";
+
+                    // rule110.sbl
                     // const char *input = "000000000000000000001";
-                    const char *input = "skis";
+
+                    // english.sbl
+                    // const char *input = "skis";
+                    const char *input = "linear";
+
                     printf("INPUT:  %s\n", input);
                     z->p = add_s_to_b(z->p, input);
                     // TODO: customizable amount of iterations
