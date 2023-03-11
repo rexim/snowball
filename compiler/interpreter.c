@@ -492,6 +492,20 @@ static int interpret_command(struct generator *g, struct SN_env *z, struct node 
         z->c = c;
         return 1;
     } break;
+
+    case c_unset: {
+        assert(p->name->type == t_boolean);
+        /* We use a single array for booleans and integers, with the
+         * integers first.
+         */
+        int count = p->name->count + g->analyser->name_count[t_integer];
+        z->I[count] = 0;
+        return 1;
+    } break;
+
+    case c_goto: {
+        assert(0 && "TODO: c_goto");
+    } break;
     }
 
     tracef_node(g, p, "command is not interpreted yet\n");
