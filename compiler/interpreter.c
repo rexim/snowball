@@ -496,7 +496,15 @@ static int interpret_command(struct generator *g, struct SN_env *z, struct node 
     } break;
 
     case c_goto: {
-        assert(0 && "TODO: c_goto");
+        assert(!(p->left->type == c_grouping || p->left->type == c_non));
+        int c = z->c;
+        while (z->c < z->l) {
+            int ret = interpret_command(g, z, p->left);
+            if (ret) return 1;
+            z->c += 1;
+        }
+        z->c = c;
+        return 0;
     } break;
     }
 
