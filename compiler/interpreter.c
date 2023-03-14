@@ -5,14 +5,6 @@
 #include <string.h>  /* for strcmp */
 #include "header.h"
 
-struct system_word {
-    int s_size;      /* size of system word */
-    const byte * s;  /* pointer to the system word */
-    int code;        /* its internal code */
-};
-
-#include "syswords.h"
-
 static struct name *find_stem(struct generator * g)
 {
     struct name * q;
