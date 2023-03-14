@@ -1,3 +1,15 @@
+// TODO: We need to explicitly support different encodings (ENC_UTF8, ENC_SINGLEBYTE, etc.)
+//
+// So far I've been using those stock dynamic arrays of symbols which are 2 bytes long.
+// But after looking around I realized that this is not particularly what we want, because those
+// arrays were designed to handle the source code of Snowball programs, not their input.
+//
+// We want to handle the input just like the generated programs. But unlike the generated
+// programs we have too support all the encodings at once, because the user may switch between
+// them at runtime.
+//
+// I do that after I make english.sbl work on words "linear" and "linearly".
+
 #include <limits.h>  /* for INT_MAX */
 #include <stdlib.h>  /* for free */
 #include <stdio.h>   /* for printf */
@@ -17,6 +29,20 @@ static struct name *find_stem(struct generator * g)
         }
     }
     return NULL;
+}
+
+static const char *printable_type_of_name(int type)
+{
+    switch (type) {
+    case t_size:     return "t_size";
+    case t_string:   return "t_string";
+    case t_boolean:  return "t_boolean";
+    case t_integer:  return "t_integer";
+    case t_routine:  return "t_routine";
+    case t_external: return "t_external";
+    case t_grouping: return "t_grouping";
+    }
+    return "<unknown>";
 }
 
 static const char *printable_type_of_node(int type)
@@ -314,6 +340,18 @@ static int interpret_AE(struct generator *g, struct SN_env *z, struct node *p)
     return 0;
 }
 
+static int in_grouping(struct SN_env * z, const symbol * s, int min, int max, int repeat) {
+    do {
+        int ch;
+        if (z->c >= z->l) return -1;
+        ch = z->p[z->c];
+        if (ch > max || (ch -= min) < 0 || (s[ch >> 3] & (0X1 << (ch & 0X7))) == 0)
+            return 1;
+        z->c++;
+    } while (repeat);
+    return 0;
+}
+
 static int interpret_command(struct generator *g, struct SN_env *z, struct node *p)
 {
     switch (p->type) {
@@ -505,6 +543,22 @@ static int interpret_command(struct generator *g, struct SN_env *z, struct node 
         }
         z->c = c;
         return 0;
+    } break;
+
+    case c_grouping: {
+        struct grouping * q = p->name->grouping;
+        // g->S[0] = p->mode == m_forward ? "" : "_b";
+        assert(p->mode == m_forward && "TODO: only forward mode is supported for now");
+        // g->S[2] = g->options->encoding == ENC_UTF8 ? "_U" : "";
+        // g->V[0] = p->name;
+        // g->I[0] = q->smallest_ch;
+        // g->I[1] = q->largest_ch;
+        tracef_node(g, p, "p->name->type = %s, SIZE(q->b) = %d\n", printable_type_of_name(p->name->type), SIZE(q->b));
+        tracef_linenumber(g, q, "The grouping defined in here\n");
+        // TODO: so groups are global vars similar to amogus
+        // we need to find where they are generated
+        // writef(g, "~Mif (in_grouping~S2(z, p->name, q->smallest_ch, q->largest_ch, 0)) ~f~C", p);
+        assert(0 && "TODO: c_grouping");
     } break;
     }
 
