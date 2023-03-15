@@ -17,21 +17,9 @@
 #include <string.h>  /* for strcmp */
 #include "header.h"
 
-static int interpret_command(struct generator *g, struct SN_env *z, struct node *p);
-
-static struct name *find_stem(struct generator * g)
-{
-    struct name * q;
-    for (q = g->analyser->names; q; q = q->next) {
-        if (q->type == t_external) {
-            char *s = b_to_s(q->b);
-            int is_stem = strcmp(s, "stem") == 0;
-            free(s);
-            if (is_stem) return q;
-        }
-    }
-    return NULL;
-}
+/// Debug Tools
+///
+/// Stuff that is useful while developing the interpreter but probably going to be removed after it's done.
 
 static const char *printable_type_of_name(int type)
 {
@@ -160,6 +148,64 @@ static const char *printable_type_of_node(int type)
         fprintf(stderr, "%s:%d: ", __FILE__, __LINE__); \
         fprintf(stderr, __VA_ARGS__); \
     } while (0)
+
+/// Runtime.
+/// Basically a mirroring of the runtime stuff that you are supposed to link with the compiled stemmers.
+/// Primary a copy-paste from ../runtime/
+
+extern struct SN_env *SN_create_env(struct generator *g)
+{
+    int * p = g->analyser->name_count;
+    int S_size = p[t_string];
+    int I_size = p[t_integer] + p[t_boolean];
+
+    struct SN_env * z = (struct SN_env *) calloc(1, sizeof(struct SN_env));
+    if (z == NULL) return NULL;
+    z->p = create_b(0);
+    if (z->p == NULL) goto error;
+    if (S_size)
+    {
+        int i;
+        z->S = (symbol * *) calloc(S_size, sizeof(symbol *));
+        if (z->S == NULL) goto error;
+
+        for (i = 0; i < S_size; i++)
+        {
+            z->S[i] = create_b(0);
+            if (z->S[i] == NULL) goto error;
+        }
+    }
+
+    if (I_size)
+    {
+        z->I = (int *) calloc(I_size, sizeof(int));
+        if (z->I == NULL) goto error;
+    }
+
+    return z;
+error:
+    SN_close_env(z, g);
+    return NULL;
+}
+
+extern void SN_close_env(struct SN_env *z, struct generator *g)
+{
+    int * p = g->analyser->name_count;
+    int S_size = p[t_string];
+    if (z == NULL) return;
+    if (S_size)
+    {
+        int i;
+        for (i = 0; i < S_size; i++)
+        {
+            lose_b(z->S[i]);
+        }
+        free(z->S);
+    }
+    free(z->I);
+    if (z->p) lose_b(z->p);
+    free(z);
+}
 
 static int eq_s(struct SN_env * z, int s_size, const symbol * s) {
     if (z->l - z->c < s_size || memcmp(z->p + z->c, s, s_size * sizeof(symbol)) != 0) return 0;
@@ -310,6 +356,11 @@ static int find_among(struct SN_env * z, const struct amongvec * v, int v_size) 
         if (i < 0) return 0;
     }
 }
+
+/// Interpreter.
+/// Everything related to traversing the Snowball AST and actually interpreting it.
+
+static int interpret_command(struct generator *g, struct SN_env *z, struct node *p);
 
 static int interpret_AE(struct generator *g, struct SN_env *z, struct node *p)
 {
@@ -557,58 +608,18 @@ static int interpret_command(struct generator *g, struct SN_env *z, struct node 
     return 0;
 }
 
-extern struct SN_env *SN_create_env(struct generator *g)
+static struct name *find_stem(struct generator * g)
 {
-    int * p = g->analyser->name_count;
-    int S_size = p[t_string];
-    int I_size = p[t_integer] + p[t_boolean];
-
-    struct SN_env * z = (struct SN_env *) calloc(1, sizeof(struct SN_env));
-    if (z == NULL) return NULL;
-    z->p = create_b(0);
-    if (z->p == NULL) goto error;
-    if (S_size)
-    {
-        int i;
-        z->S = (symbol * *) calloc(S_size, sizeof(symbol *));
-        if (z->S == NULL) goto error;
-
-        for (i = 0; i < S_size; i++)
-        {
-            z->S[i] = create_b(0);
-            if (z->S[i] == NULL) goto error;
+    struct name * q;
+    for (q = g->analyser->names; q; q = q->next) {
+        if (q->type == t_external) {
+            char *s = b_to_s(q->b);
+            int is_stem = strcmp(s, "stem") == 0;
+            free(s);
+            if (is_stem) return q;
         }
     }
-
-    if (I_size)
-    {
-        z->I = (int *) calloc(I_size, sizeof(int));
-        if (z->I == NULL) goto error;
-    }
-
-    return z;
-error:
-    SN_close_env(z, g);
     return NULL;
-}
-
-extern void SN_close_env(struct SN_env *z, struct generator *g)
-{
-    int * p = g->analyser->name_count;
-    int S_size = p[t_string];
-    if (z == NULL) return;
-    if (S_size)
-    {
-        int i;
-        for (i = 0; i < S_size; i++)
-        {
-            lose_b(z->S[i]);
-        }
-        free(z->S);
-    }
-    free(z->I);
-    if (z->p) lose_b(z->p);
-    free(z);
 }
 
 extern void interpret(struct generator *g, struct SN_env *z)
