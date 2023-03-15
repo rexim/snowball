@@ -17,6 +17,8 @@
 #include <string.h>  /* for strcmp */
 #include "header.h"
 
+static int interpret_command(struct generator *g, struct SN_env *z, struct node *p);
+
 static struct name *find_stem(struct generator * g)
 {
     struct name * q;
@@ -340,226 +342,213 @@ static int interpret_AE(struct generator *g, struct SN_env *z, struct node *p)
     return 0;
 }
 
-static int in_grouping(struct SN_env * z, const symbol * s, int min, int max, int repeat) {
-    do {
-        int ch;
-        if (z->c >= z->l) return -1;
-        ch = z->p[z->c];
-        if (ch > max || (ch -= min) < 0 || (s[ch >> 3] & (0X1 << (ch & 0X7))) == 0)
+static int interpret_repeat(struct generator *g, struct SN_env *z, struct node *p) {
+    while (1) {
+        int c = z->c;
+        int s = interpret_command(g, z, p->left);
+        if (!s) {
+            z->c = c;
             return 1;
-        z->c++;
-    } while (repeat);
+        }
+    }
+    assert(0 && "unreachable");
+}
+
+static int interpret_or(struct generator *g, struct SN_env *z, struct node *p) {
+    p = p->left;
+    while (p) {
+        int c = z->c;
+        int s = interpret_command(g, z, p);
+        if (s) return 1;
+        z->c = c;
+        p = p->right;
+    }
     return 0;
 }
 
-static int interpret_command(struct generator *g, struct SN_env *z, struct node *p)
-{
+static int interpret_and(struct generator *g, struct SN_env *z, struct node *p) {
+    p = p->left;
+    while (p) {
+        int c = z->c;
+        int s = interpret_command(g, z, p);
+        if (!s) return 0;
+        z->c = c;
+        p = p->right;
+    }
+    return 1;
+}
+
+static int interpret_bra(struct generator *g, struct SN_env *z, struct node *p) {
+    p = p->left;
+    while (p) {
+        int s = interpret_command(g, z, p);
+        if (!s) return 0;
+        p = p->right;
+    }
+    return 1;
+}
+
+static int interpret_leftslice(struct SN_env *z, struct node *p) {
+    assert(p->mode == m_forward && "TODO: only forward mode is supported for now");
+    z->bra = z->c;
+    return 1;
+}
+
+static int interpret_rightslice(struct SN_env *z, struct node *p) {
+    assert(p->mode == m_forward && "TODO: only forward mode is supported for now");
+    z->ket = z->c;
+    return 1;
+}
+
+static int interpret_literalstring(struct SN_env *z, struct node *p) {
+    // TODO: in the generator version there is also case when SIZE(b) == 1 for optimization reasons
+    // Should we do the same in here too?
+    symbol * b = p->literalstring;
+    return eq_s(z, SIZE(b), b);
+}
+
+static int interpret_slicefrom(struct SN_env *z, struct node *p) {
+    assert(p->literalstring != NULL);
+    slice_from_v(z, p->literalstring);
+    return 1;
+}
+
+static int interpret_mathassign(struct generator *g, struct SN_env *z, struct node *p) {
+    switch (p->name->type) {
+    case t_integer: {
+        int count = p->name->count;
+        if (count < 0) {
+            fprintf(stderr, "Reference to optimised out variable ");
+            report_b(stderr, p->name->b);
+            fprintf(stderr, " attempted\n");
+            exit(1);
+        }
+        z->I[count] = interpret_AE(g, z, p->AE);
+    } break;
+
+    default: assert(0 && "TODO: assigning this kind of variables is not implemented yet");
+    }
+
+    return 1;
+}
+
+static int interpret_substring(struct SN_env *z, struct node *p) {
+    assert(p->mode == m_forward && "TODO: only forward mode is supported for now");
+    // TODO: The original generate_substring() had some sort of optimization. Is it applicable here?
+    struct among * x = p->among;
+    int among_var = find_among(z, x->b, x->literalstring_count);
+    // TODO: I'm not sure if this is the best solution since I have a limited understand of how amogus works
+    if (x->amongvar_needed) z->among_var = among_var;
+    return among_var;
+}
+
+static int interpret_among(struct generator *g, struct SN_env *z, struct node *p) {
+    struct among * x = p->among;
+    if (x->substring == 0) {
+        assert(0 && "TODO: interpret_substring()");
+        //generate_substring(g, p);
+    }
+    if (x->starter != 0) {
+        assert(0 && "TODO: interpret(x->starter)");
+        //generate(g, x->starter);
+    }
+    if (x->command_count == 1 && x->nocommand_count == 0) {
+        /* Only one outcome ("no match" already handled). */
+        assert(0 && "TODO: interpret(x->commands[0])");
+        //generate(g, x->commands[0]);
+    } else if (x->command_count > 0) {
+        assert(x->amongvar_needed);
+        assert(z->among_var - 1 < x->command_count);
+        return interpret_command(g, z, x->commands[z->among_var - 1]);
+    }
+    assert(0 && "TODO: c_among");
+}
+
+static int interpret_atlimit(struct SN_env *z, struct node *p) {
+    assert(p->mode == m_forward && "TODO: only forward mode is supported for now");
+    return !(z->c < z->l);
+}
+
+static int interpret_hop(struct generator *g, struct SN_env *z, struct node *p) {
+    assert(p->mode == m_forward && "TODO: only forward mode is supported for now");
+    // Based on the description from manual
+    int ae = interpret_AE(g, z, p->AE);
+    if (ae < 0) return 0;
+    if (z->c + ae > z->l) return 0;
+    z->c += ae;
+    return 1;
+}
+
+static int interpret_do(struct generator *g, struct SN_env *z, struct node *p) {
+    int c = z->c;
+    interpret_command(g, z, p->left);
+    z->c = c;
+    return 1;
+}
+
+static int interpret_unset(struct generator *g, struct SN_env *z, struct node *p) {
+    assert(p->name->type == t_boolean);
+    /* We use a single array for booleans and integers, with the
+    * integers first.
+    */
+    int count = p->name->count + g->analyser->name_count[t_integer];
+    z->I[count] = 0;
+    return 1;
+}
+
+static int interpret_goto(struct generator *g, struct SN_env *z, struct node *p) {
+    assert(!(p->left->type == c_grouping || p->left->type == c_non));
+    int c = z->c;
+    while (z->c < z->l) {
+        int ret = interpret_command(g, z, p->left);
+        if (ret) return 1;
+        z->c += 1;
+    }
+    z->c = c;
+    return 0;
+}
+
+static int interpret_grouping(struct generator *g, struct SN_env *z, struct node *p) {
+    struct grouping * q = p->name->grouping;
+    // g->S[0] = p->mode == m_forward ? "" : "_b";
+    assert(p->mode == m_forward && "TODO: only forward mode is supported for now");
+    // g->S[2] = g->options->encoding == ENC_UTF8 ? "_U" : "";
+    // g->V[0] = p->name;
+    // g->I[0] = q->smallest_ch;
+    // g->I[1] = q->largest_ch;
+    tracef_node(g, p, "p->name->type = %s, SIZE(q->b) = %d\n", printable_type_of_name(p->name->type), SIZE(q->b));
+    tracef_linenumber(g, q, "The grouping defined in here\n");
+    // TODO: so groups are global vars similar to amogus
+    // we need to find where they are generated
+    (void) z;
+    // writef(g, "~Mif (in_grouping~S2(z, p->name, q->smallest_ch, q->largest_ch, 0)) ~f~C", p);
+    assert(0 && "TODO: c_grouping");
+}
+
+static int interpret_command(struct generator *g, struct SN_env *z, struct node *p) {
     switch (p->type) {
-    case c_repeat: {
-        while (1) {
-            int c = z->c;
-            int s = interpret_command(g, z, p->left);
-            if (!s) {
-                z->c = c;
-                return 1;
-            }
-        }
-        assert(0 && "unreachable");
-    }
-    break;
-
-    case c_or: {
-        p = p->left;
-        while (p) {
-            int c = z->c;
-            int s = interpret_command(g, z, p);
-            if (s) return 1;
-            z->c = c;
-            p = p->right;
-        }
-        return 0;
-    }
-    break;
-
-    case c_and: {
-        p = p->left;
-        while (p) {
-            int c = z->c;
-            int s = interpret_command(g, z, p);
-            if (!s) return 0;
-            z->c = c;
-            p = p->right;
-        }
-        return 1;
-    }
-    break;
-
-    case c_bra: {
-        p = p->left;
-        while (p) {
-            int s = interpret_command(g, z, p);
-            if (!s) return 0;
-            p = p->right;
-        }
-        return 1;
-    }
-    break;
-
-    case c_leftslice: {
-        assert(p->mode == m_forward);
-        z->bra = z->c;
-        return 1;
-    } break;
-
-    case c_rightslice: {
-        assert(p->mode == m_forward);
-        z->ket = z->c;
-        return 1;
-    } break;
-
-    case c_literalstring: {
-        // TODO: in the generator there is also case when SIZE(b) == 1 for optimization reasons
-        // Should we do the same in here too?
-        symbol * b = p->literalstring;
-        return eq_s(z, SIZE(b), b);
-    } break;
-
-    case c_slicefrom: {
-        assert(p->literalstring != NULL);
-        slice_from_v(z, p->literalstring);
-        return 1;
-    } break;
-
-    case c_true: {
-        return 1;
-    } break;
-
-    case c_false: {
-        return 0;
-    } break;
-
-    case c_mathassign: {
-        switch (p->name->type) {
-        case t_integer: {
-            int count = p->name->count;
-            if (count < 0) {
-                fprintf(stderr, "Reference to optimised out variable ");
-                report_b(stderr, p->name->b);
-                fprintf(stderr, " attempted\n");
-                exit(1);
-            }
-            z->I[count] = interpret_AE(g, z, p->AE);
-        } break;
-
-        default: assert(0 && "TODO: assigning this kind of variables is not implemented yet");
-        }
-
-        return 1;
-    } break;
-
-    case c_eq: {
-        return interpret_AE(g, z, p->left) == interpret_AE(g, z, p->AE);
-    } break;
-
-    case c_call: {
-        return interpret_command(g, z, p->name->definition);
-    } break;
-
-    case c_substring: {
-        assert(p->mode == m_forward && "TODO: only forward mode is supported for now");
-        // TODO: The original generate_substring() had some sort of optimization. Is it applicable here?
-        struct among * x = p->among;
-        int among_var = find_among(z, x->b, x->literalstring_count);
-        // TODO: I'm not sure if this is the best solution since I have a limited understand of how amogus works
-        if (x->amongvar_needed) z->among_var = among_var;
-        return among_var;
-    } break;
-
-    case c_among: {
-        struct among * x = p->among;
-        if (x->substring == 0) {
-            assert(0 && "TODO: interpret_substring()");
-            //generate_substring(g, p);
-        }
-        if (x->starter != 0) {
-            assert(0 && "TODO: interpret(x->starter)");
-            //generate(g, x->starter);
-        }
-        if (x->command_count == 1 && x->nocommand_count == 0) {
-            /* Only one outcome ("no match" already handled). */
-            assert(0 && "TODO: interpret(x->commands[0])");
-            //generate(g, x->commands[0]);
-        } else if (x->command_count > 0) {
-            assert(x->amongvar_needed);
-            assert(z->among_var - 1 < x->command_count);
-            return interpret_command(g, z, x->commands[z->among_var - 1]);
-        }
-        assert(0 && "TODO: c_among");
-    } break;
-
-    case c_atlimit: {
-        assert(p->mode == m_forward && "TODO: only forward mode is supported for now");
-        return !(z->c < z->l);
-    } break;
-
-    case c_not: {
-        return !interpret_command(g, z, p->left);
-    } break;
-
-    case c_hop: {
-        assert(p->mode == m_forward && "TODO: only forward mode is supported for now");
-        // Based on the description from manual
-        int ae = interpret_AE(g, z, p->AE);
-        if (ae < 0) return 0;
-        if (z->c + ae > z->l) return 0;
-        z->c += ae;
-        return 1;
-    } break;
-
-    case c_do: {
-        int c = z->c;
-        interpret_command(g, z, p->left);
-        z->c = c;
-        return 1;
-    } break;
-
-    case c_unset: {
-        assert(p->name->type == t_boolean);
-        /* We use a single array for booleans and integers, with the
-         * integers first.
-         */
-        int count = p->name->count + g->analyser->name_count[t_integer];
-        z->I[count] = 0;
-        return 1;
-    } break;
-
-    case c_goto: {
-        assert(!(p->left->type == c_grouping || p->left->type == c_non));
-        int c = z->c;
-        while (z->c < z->l) {
-            int ret = interpret_command(g, z, p->left);
-            if (ret) return 1;
-            z->c += 1;
-        }
-        z->c = c;
-        return 0;
-    } break;
-
-    case c_grouping: {
-        struct grouping * q = p->name->grouping;
-        // g->S[0] = p->mode == m_forward ? "" : "_b";
-        assert(p->mode == m_forward && "TODO: only forward mode is supported for now");
-        // g->S[2] = g->options->encoding == ENC_UTF8 ? "_U" : "";
-        // g->V[0] = p->name;
-        // g->I[0] = q->smallest_ch;
-        // g->I[1] = q->largest_ch;
-        tracef_node(g, p, "p->name->type = %s, SIZE(q->b) = %d\n", printable_type_of_name(p->name->type), SIZE(q->b));
-        tracef_linenumber(g, q, "The grouping defined in here\n");
-        // TODO: so groups are global vars similar to amogus
-        // we need to find where they are generated
-        // writef(g, "~Mif (in_grouping~S2(z, p->name, q->smallest_ch, q->largest_ch, 0)) ~f~C", p);
-        assert(0 && "TODO: c_grouping");
-    } break;
+    case c_repeat:        return interpret_repeat(g, z, p);
+    case c_or:            return interpret_or(g, z, p);
+    case c_and:           return interpret_and(g, z, p);
+    case c_bra:           return interpret_bra(g, z, p);
+    case c_leftslice:     return interpret_leftslice(z, p);
+    case c_rightslice:    return interpret_rightslice(z, p);
+    case c_literalstring: return interpret_literalstring(z, p);
+    case c_slicefrom:     return interpret_slicefrom(z, p);
+    case c_true:          return 1;
+    case c_false:         return 0;
+    case c_mathassign:    return interpret_mathassign(g, z, p);
+    case c_eq:            return interpret_AE(g, z, p->left) == interpret_AE(g, z, p->AE);
+    case c_call:          return interpret_command(g, z, p->name->definition);
+    case c_substring:     return interpret_substring(z, p);
+    case c_among:         return interpret_among(g, z, p);
+    case c_atlimit:       return interpret_atlimit(z, p);
+    case c_not:           return !interpret_command(g, z, p->left);
+    case c_hop:           return interpret_hop(g, z, p);
+    case c_do:            return interpret_do(g, z, p);
+    case c_unset:         return interpret_unset(g, z, p);
+    case c_goto:          return interpret_goto(g, z, p);
+    case c_grouping:      return interpret_grouping(g, z, p);
     }
 
     tracef_node(g, p, "command is not interpreted yet\n");
