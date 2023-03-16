@@ -512,9 +512,9 @@ static int interpret_substring(struct SN_env *z, struct node *p) {
 static int interpret_among(struct generator *g, struct SN_env *z, struct node *p) {
     struct among * x = p->among;
     if (x->substring == 0) {
-        tracef_node(g, p, "interpret_substring()\n");
-        assert(0 && "TODO: interpret_substring()");
-        //generate_substring(g, p);
+        assert(x->command_count == 0);
+        assert(x->starter == NULL);
+        return interpret_substring(z, p);
     }
     if (x->starter != 0) {
         tracef_node(g, p, "interpret(x->starter)\n");
