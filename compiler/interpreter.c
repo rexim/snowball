@@ -150,8 +150,8 @@ static const char *printable_type_of_node(int type)
     } while (0)
 
 /// Runtime.
-/// Basically a mirroring of the runtime stuff that you are supposed to link with the compiled stemmers.
-/// Primary a copy-paste from ../runtime/
+/// Basically a mirroring of the runtime stuff that you are supposed to link the compiled stemmers with.
+/// Primarily a copy-paste from ../runtime/
 
 extern struct SN_env *SN_create_env(struct generator *g)
 {
@@ -377,9 +377,7 @@ static int interpret_command(struct generator *g, struct SN_env *z, struct node 
 static int interpret_AE(struct generator *g, struct SN_env *z, struct node *p)
 {
     switch (p->type) {
-    case c_number: {
-        return p->number;
-    } break;
+    case c_number: return p->number;
 
     case c_name: {
         switch (p->name->type) {
@@ -394,13 +392,14 @@ static int interpret_AE(struct generator *g, struct SN_env *z, struct node *p)
             return z->I[count];
         } break;
 
-        default: assert(0 && "TODO: evaluting this kind of variables is not implemented yet");
+        default:
+            tracef_linenumber(g, p, "%s: type is not interpreted yet.\n", printable_type_of_name(p->name->type));
+            tracef_here("add another switch-case up there\n");
+            exit(1);
         }
     } break;
 
-    case c_limit: {
-        return z->l;
-    } break;
+    case c_limit: return z->l;
     }
 
     tracef_node(g, p, "AE is not interpreted yet\n");
@@ -559,8 +558,8 @@ static int interpret_do(struct generator *g, struct SN_env *z, struct node *p) {
 static int interpret_unset(struct generator *g, struct SN_env *z, struct node *p) {
     assert(p->name->type == t_boolean);
     /* We use a single array for booleans and integers, with the
-    * integers first.
-    */
+     * integers first.
+     */
     int count = p->name->count + g->analyser->name_count[t_integer];
     z->I[count] = 0;
     return 1;
@@ -570,12 +569,22 @@ static int interpret_goto(struct generator *g, struct SN_env *z, struct node *p)
     assert(!(p->left->type == c_grouping || p->left->type == c_non));
     int c = z->c;
     while (z->c < z->l) {
+        // TODO: I feel like this is incorrect
+        // If the command matches it will position c->z after the matched string which is the behaviour of gopast.
         int ret = interpret_command(g, z, p->left);
         if (ret) return 1;
         z->c += 1;
     }
     z->c = c;
     return 0;
+}
+
+static int interpret_gopast(struct generator *g, struct SN_env *z, struct node *p)
+{
+    (void) g;
+    (void) z;
+    (void) p;
+    assert(0 && "TODO: c_gopast");
 }
 
 // NOTE: literally copy-pasted from generator.c
@@ -631,6 +640,7 @@ static int interpret_command(struct generator *g, struct SN_env *z, struct node 
     case c_unset:         return interpret_unset(g, z, p);
     case c_goto:          return interpret_goto(g, z, p);
     case c_grouping:      return interpret_grouping(g, z, p);
+    case c_gopast:        return interpret_gopast(g, z, p);
     }
 
     tracef_node(g, p, "command is not interpreted yet\n");
@@ -653,6 +663,9 @@ static struct name *find_stem(struct generator * g)
     return NULL;
 }
 
+// TODO: passing `struct generator` everywhere is an overkill. We only need `struct analyzer` and `struct options`.
+// Let's construct `struct interpreter` similar to `struct generator` that will contain both
+// the analyser and the options plus maybe some interpreter-specific stuff if we ever need that.
 extern void interpret(struct generator *g, struct SN_env *z)
 {
     struct name *stem = find_stem(g);
