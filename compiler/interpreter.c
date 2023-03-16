@@ -397,6 +397,10 @@ static int interpret_AE(struct generator *g, struct SN_env *z, struct node *p)
         default: assert(0 && "TODO: evaluting this kind of variables is not implemented yet");
         }
     } break;
+
+    case c_limit: {
+        return z->l;
+    } break;
     }
 
     tracef_node(g, p, "AE is not interpreted yet\n");
