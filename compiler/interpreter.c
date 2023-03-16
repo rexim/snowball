@@ -357,6 +357,18 @@ static int find_among(struct SN_env * z, const struct amongvec * v, int v_size) 
     }
 }
 
+static int in_grouping(struct SN_env * z, const symbol * s, int min, int max, int repeat) {
+    do {
+        int ch;
+        if (z->c >= z->l) return -1;
+        ch = z->p[z->c];
+        if (ch > max || (ch -= min) < 0 || (s[ch >> 3] & (0X1 << (ch & 0X7))) == 0)
+            return 1;
+        z->c++;
+    } while (repeat);
+    return 0;
+}
+
 /// Interpreter.
 /// Everything related to traversing the Snowball AST and actually interpreting it.
 
@@ -559,21 +571,33 @@ static int interpret_goto(struct generator *g, struct SN_env *z, struct node *p)
     return 0;
 }
 
+// NOTE: literally copy-pasted from generator.c
+static void set_bit(symbol * b, int i) { b[i/8] |= 1 << i%8; }
+static symbol *generate_grouping_table(struct grouping * q) {
+    int range = q->largest_ch - q->smallest_ch + 1;
+    int size = (range + 7)/ 8;  /* assume 8 bits per symbol */
+    symbol * b = q->b;
+    symbol * map = create_b(size);
+    int i;
+    for (i = 0; i < size; i++) map[i] = 0;
+
+    for (i = 0; i < SIZE(b); i++) set_bit(map, b[i] - q->smallest_ch);
+
+    return map;
+}
+
 static int interpret_grouping(struct generator *g, struct SN_env *z, struct node *p) {
     struct grouping * q = p->name->grouping;
-    // g->S[0] = p->mode == m_forward ? "" : "_b";
     assert(p->mode == m_forward && "TODO: only forward mode is supported for now");
-    // g->S[2] = g->options->encoding == ENC_UTF8 ? "_U" : "";
-    // g->V[0] = p->name;
-    // g->I[0] = q->smallest_ch;
-    // g->I[1] = q->largest_ch;
-    tracef_node(g, p, "p->name->type = %s, SIZE(q->b) = %d\n", printable_type_of_name(p->name->type), SIZE(q->b));
-    tracef_linenumber(g, q, "The grouping defined in here\n");
-    // TODO: so groups are global vars similar to amogus
-    // we need to find where they are generated
-    (void) z;
-    // writef(g, "~Mif (in_grouping~S2(z, p->name, q->smallest_ch, q->largest_ch, 0)) ~f~C", p);
-    assert(0 && "TODO: c_grouping");
+    assert(g->options->encoding == ENC_SINGLEBYTE && "TODO: only single byte encoding supported for now");
+    // TODO: This is extremely slow. In generator.c these tables are pre-generated at compile time.
+    //
+    // Here we are rebuilding them every time at runtime. It's fine just advance the development.
+    // But we need to go back here later and pre-generate it as well. Maybe put them in the SN_env.
+    symbol *map = generate_grouping_table(q);
+    int ret = in_grouping(z, map, q->smallest_ch, q->largest_ch, 0);
+    lose_b(map);
+    return ret;
 }
 
 static int interpret_command(struct generator *g, struct SN_env *z, struct node *p) {
