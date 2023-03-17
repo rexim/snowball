@@ -357,6 +357,18 @@ static int find_among(struct SN_env * z, const struct amongvec * v, int v_size) 
     }
 }
 
+static int out_grouping(struct SN_env * z, const symbol * s, int min, int max, int repeat) {
+    do {
+        int ch;
+        if (z->c >= z->l) return -1;
+        ch = z->p[z->c];
+        if (!(ch > max || (ch -= min) < 0 || (s[ch >> 3] & (0X1 << (ch & 0X7))) == 0))
+            return 1;
+        z->c++;
+    } while (repeat);
+    return 0;
+}
+
 static int in_grouping(struct SN_env * z, const symbol * s, int min, int max, int repeat) {
     do {
         int ch;
@@ -597,7 +609,7 @@ static symbol *generate_grouping_table(struct grouping * q) {
     return map;
 }
 
-static int interpret_grouping(struct generator *g, struct SN_env *z, struct node *p) {
+static int interpret_grouping(struct generator *g, struct SN_env *z, struct node *p, int complement) {
     struct grouping * q = p->name->grouping;
     assert(p->mode == m_forward && "TODO: only forward mode is supported for now");
     assert(g->options->encoding == ENC_SINGLEBYTE && "TODO: only single byte encoding supported for now");
@@ -606,7 +618,12 @@ static int interpret_grouping(struct generator *g, struct SN_env *z, struct node
     // Here we are rebuilding them every time at runtime. It's fine just advance the development.
     // But we need to go back here later and pre-generate it as well. Maybe put them in the SN_env.
     symbol *map = generate_grouping_table(q);
-    int ret = in_grouping(z, map, q->smallest_ch, q->largest_ch, 0);
+    int ret;
+    if (complement) {
+        ret = out_grouping(z, map, q->smallest_ch, q->largest_ch, 0);
+    } else {
+        ret = in_grouping(z, map, q->smallest_ch, q->largest_ch, 0);
+    }
     lose_b(map);
     return ret;
 }
@@ -633,7 +650,8 @@ static int interpret_command(struct generator *g, struct SN_env *z, struct node 
     case c_hop:           return interpret_hop(g, z, p);
     case c_do:            return interpret_do(g, z, p);
     case c_unset:         return interpret_unset(g, z, p);
-    case c_grouping:      return interpret_grouping(g, z, p);
+    case c_grouping:      return interpret_grouping(g, z, p, false);
+    case c_non:           return interpret_grouping(g, z, p, true);
     case c_goto:          return interpret_GO(g, z, p, 1);
     case c_gopast:        return interpret_GO(g, z, p, 0);
     }
