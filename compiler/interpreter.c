@@ -504,7 +504,10 @@ static int interpret_mathassign(struct generator *g, struct SN_env *z, struct no
         z->I[count] = interpret_AE(g, z, p->AE);
     } break;
 
-    default: assert(0 && "TODO: assigning this kind of variables is not implemented yet");
+    default:
+        tracef_linenumber(g, p, "%s: type is not interpreted yet.\n", printable_type_of_name(p->name->type));
+        tracef_here("add another switch-case up there\n");
+        exit(1);
     }
 
     return 1;
@@ -628,6 +631,28 @@ static int interpret_grouping(struct generator *g, struct SN_env *z, struct node
     return ret;
 }
 
+static int interpret_setmark(struct generator *g, struct SN_env *z, struct node *p)
+{
+    switch (p->name->type) {
+    case t_integer: {
+        int count = p->name->count;
+        if (count < 0) {
+            fprintf(stderr, "Reference to optimised out variable ");
+            report_b(stderr, p->name->b);
+            fprintf(stderr, " attempted\n");
+            exit(1);
+        }
+        z->I[count] = z->c;
+    } break;
+
+    default:
+        tracef_linenumber(g, p, "%s: type is not interpreted yet.\n", printable_type_of_name(p->name->type));
+        tracef_here("add another switch-case up there\n");
+        exit(1);
+    }
+    return 0;
+}
+
 static int interpret_command(struct generator *g, struct SN_env *z, struct node *p) {
     switch (p->type) {
     case c_repeat:        return interpret_repeat(g, z, p);
@@ -654,6 +679,7 @@ static int interpret_command(struct generator *g, struct SN_env *z, struct node 
     case c_non:           return interpret_grouping(g, z, p, true);
     case c_goto:          return interpret_GO(g, z, p, 1);
     case c_gopast:        return interpret_GO(g, z, p, 0);
+    case c_setmark:       return interpret_setmark(g, z, p);
     }
 
     tracef_node(g, p, "command is not interpreted yet\n");
