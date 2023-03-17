@@ -565,26 +565,21 @@ static int interpret_unset(struct generator *g, struct SN_env *z, struct node *p
     return 1;
 }
 
-static int interpret_goto(struct generator *g, struct SN_env *z, struct node *p) {
-    assert(!(p->left->type == c_grouping || p->left->type == c_non));
-    int c = z->c;
+static int interpret_GO(struct generator *g, struct SN_env *z, struct node *p, int style) {
+    // assert(!(p->left->type == c_grouping || p->left->type == c_non));
+    // TODO: there is an optimization when (p->left->type == c_grouping || p->left->type == c_non)
+    // See generate_GO and generate_GO_grouping() for more info.
+    assert(g->options->encoding == ENC_SINGLEBYTE && "TODO: only single byte encoding supported for now");
     while (z->c < z->l) {
-        // TODO: I feel like this is incorrect
-        // If the command matches it will position c->z after the matched string which is the behaviour of gopast.
+        int c = z->c;
         int ret = interpret_command(g, z, p->left);
-        if (ret) return 1;
+        if (ret) {
+            if (style) z->c = c;
+            return 1;
+        }
         z->c += 1;
     }
-    z->c = c;
     return 0;
-}
-
-static int interpret_gopast(struct generator *g, struct SN_env *z, struct node *p)
-{
-    (void) g;
-    (void) z;
-    (void) p;
-    assert(0 && "TODO: c_gopast");
 }
 
 // NOTE: literally copy-pasted from generator.c
@@ -638,9 +633,9 @@ static int interpret_command(struct generator *g, struct SN_env *z, struct node 
     case c_hop:           return interpret_hop(g, z, p);
     case c_do:            return interpret_do(g, z, p);
     case c_unset:         return interpret_unset(g, z, p);
-    case c_goto:          return interpret_goto(g, z, p);
     case c_grouping:      return interpret_grouping(g, z, p);
-    case c_gopast:        return interpret_gopast(g, z, p);
+    case c_goto:          return interpret_GO(g, z, p, 1);
+    case c_gopast:        return interpret_GO(g, z, p, 0);
     }
 
     tracef_node(g, p, "command is not interpreted yet\n");
