@@ -387,7 +387,7 @@ extern void generate_program_c(struct generator * g);
 #ifndef DISABLE_INTERPRET
 struct SN_env {
     symbol * p;
-    int c, l, bra, ket;
+    int c, l, lb, bra, ket;
     symbol * * S;
     int * I;
     int among_var;

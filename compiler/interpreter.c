@@ -585,6 +585,7 @@ static int interpret_GO(struct generator *g, struct SN_env *z, struct node *p, i
     // TODO: there is an optimization when (p->left->type == c_grouping || p->left->type == c_non)
     // See generate_GO and generate_GO_grouping() for more info.
     assert(g->options->encoding == ENC_SINGLEBYTE && "TODO: only single byte encoding supported for now");
+    assert(p->mode == m_forward && "TODO: only forward mode is support for now");
     while (z->c < z->l) {
         int c = z->c;
         int ret = interpret_command(g, z, p->left);
@@ -592,6 +593,7 @@ static int interpret_GO(struct generator *g, struct SN_env *z, struct node *p, i
             if (style) z->c = c;
             return 1;
         }
+
         z->c += 1;
     }
     return 0;
@@ -653,6 +655,26 @@ static int interpret_setmark(struct generator *g, struct SN_env *z, struct node 
     return 0;
 }
 
+static int interpret_backwards(struct generator *g, struct SN_env *z, struct node *p)
+{
+    // // From the generator
+    // writef(g, "~Mz->lb = z->c; z->c = z->l;~C~N", p);
+    // generate(g, p->left);
+    // w(g, "~Mz->c = z->lb;~N");
+
+    z->lb = z->c;
+    z->c = z->l;
+
+    // TODO: before implementing this we need to go through all the interpreters and make sure that they have
+    // assert(p->mode == m_forward) where necessary
+
+    tracef_node(g, p->left, "command of backwards\n");
+    assert(p->mode == m_backward);
+    assert(p->left->mode == m_backward);
+    assert(0 && "c_backwards");
+    return 0;
+}
+
 static int interpret_command(struct generator *g, struct SN_env *z, struct node *p) {
     switch (p->type) {
     case c_repeat:        return interpret_repeat(g, z, p);
@@ -680,6 +702,7 @@ static int interpret_command(struct generator *g, struct SN_env *z, struct node 
     case c_goto:          return interpret_GO(g, z, p, 1);
     case c_gopast:        return interpret_GO(g, z, p, 0);
     case c_setmark:       return interpret_setmark(g, z, p);
+    case c_backwards:     return interpret_backwards(g, z, p);
     }
 
     tracef_node(g, p, "command is not interpreted yet\n");
