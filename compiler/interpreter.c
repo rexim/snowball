@@ -386,8 +386,9 @@ static int in_grouping(struct SN_env * z, const symbol * s, int min, int max, in
 
 static int interpret_command(struct generator *g, struct SN_env *z, struct node *p);
 
-static int interpret_AE(struct generator *g, struct SN_env *z, struct node *p)
-{
+static int interpret_AE(struct generator *g, struct SN_env *z, struct node *p) {
+    assert(p->mode == m_forward && "TODO: only forward mode is supported for now");
+
     switch (p->type) {
     case c_number: return p->number;
 
@@ -421,6 +422,8 @@ static int interpret_AE(struct generator *g, struct SN_env *z, struct node *p)
 }
 
 static int interpret_repeat(struct generator *g, struct SN_env *z, struct node *p) {
+    assert(p->mode == m_forward && "TODO: only forward mode is supported for now");
+
     while (1) {
         int c = z->c;
         int s = interpret_command(g, z, p->left);
@@ -433,6 +436,8 @@ static int interpret_repeat(struct generator *g, struct SN_env *z, struct node *
 }
 
 static int interpret_or(struct generator *g, struct SN_env *z, struct node *p) {
+    assert(p->mode == m_forward && "TODO: only forward mode is supported for now");
+
     p = p->left;
     while (p) {
         int c = z->c;
@@ -445,6 +450,8 @@ static int interpret_or(struct generator *g, struct SN_env *z, struct node *p) {
 }
 
 static int interpret_and(struct generator *g, struct SN_env *z, struct node *p) {
+    assert(p->mode == m_forward && "TODO: only forward mode is supported for now");
+
     p = p->left;
     while (p) {
         int c = z->c;
@@ -457,6 +464,8 @@ static int interpret_and(struct generator *g, struct SN_env *z, struct node *p) 
 }
 
 static int interpret_bra(struct generator *g, struct SN_env *z, struct node *p) {
+    assert(p->mode == m_forward && "TODO: only forward mode is supported for now");
+
     p = p->left;
     while (p) {
         int s = interpret_command(g, z, p);
@@ -468,17 +477,20 @@ static int interpret_bra(struct generator *g, struct SN_env *z, struct node *p) 
 
 static int interpret_leftslice(struct SN_env *z, struct node *p) {
     assert(p->mode == m_forward && "TODO: only forward mode is supported for now");
+
     z->bra = z->c;
     return 1;
 }
 
 static int interpret_rightslice(struct SN_env *z, struct node *p) {
     assert(p->mode == m_forward && "TODO: only forward mode is supported for now");
+
     z->ket = z->c;
     return 1;
 }
 
 static int interpret_literalstring(struct SN_env *z, struct node *p) {
+    assert(p->mode == m_forward && "TODO: only forward mode is supported for now");
     // TODO: in the generator version there is also case when SIZE(b) == 1 for optimization reasons
     // Should we do the same in here too?
     symbol * b = p->literalstring;
@@ -486,12 +498,14 @@ static int interpret_literalstring(struct SN_env *z, struct node *p) {
 }
 
 static int interpret_slicefrom(struct SN_env *z, struct node *p) {
+    assert(p->mode == m_forward && "TODO: only forward mode is supported for now");
     assert(p->literalstring != NULL);
     slice_from_v(z, p->literalstring);
     return 1;
 }
 
 static int interpret_mathassign(struct generator *g, struct SN_env *z, struct node *p) {
+    assert(p->mode == m_forward && "TODO: only forward mode is supported for now");
     switch (p->name->type) {
     case t_integer: {
         int count = p->name->count;
@@ -524,6 +538,7 @@ static int interpret_substring(struct SN_env *z, struct node *p) {
 }
 
 static int interpret_among(struct generator *g, struct SN_env *z, struct node *p) {
+    assert(p->mode == m_forward && "TODO: only forward mode is supported for now");
     struct among * x = p->among;
     if (x->substring == 0) {
         assert(x->command_count == 0);
@@ -564,6 +579,7 @@ static int interpret_hop(struct generator *g, struct SN_env *z, struct node *p) 
 }
 
 static int interpret_do(struct generator *g, struct SN_env *z, struct node *p) {
+    assert(p->mode == m_forward && "TODO: only forward mode is supported for now");
     int c = z->c;
     interpret_command(g, z, p->left);
     z->c = c;
@@ -571,6 +587,7 @@ static int interpret_do(struct generator *g, struct SN_env *z, struct node *p) {
 }
 
 static int interpret_unset(struct generator *g, struct SN_env *z, struct node *p) {
+    assert(p->mode == m_forward && "TODO: only forward mode is supported for now");
     assert(p->name->type == t_boolean);
     /* We use a single array for booleans and integers, with the
      * integers first.
@@ -581,11 +598,11 @@ static int interpret_unset(struct generator *g, struct SN_env *z, struct node *p
 }
 
 static int interpret_GO(struct generator *g, struct SN_env *z, struct node *p, int style) {
+    assert(p->mode == m_forward && "TODO: only forward mode is support for now");
     // assert(!(p->left->type == c_grouping || p->left->type == c_non));
     // TODO: there is an optimization when (p->left->type == c_grouping || p->left->type == c_non)
     // See generate_GO and generate_GO_grouping() for more info.
     assert(g->options->encoding == ENC_SINGLEBYTE && "TODO: only single byte encoding supported for now");
-    assert(p->mode == m_forward && "TODO: only forward mode is support for now");
     while (z->c < z->l) {
         int c = z->c;
         int ret = interpret_command(g, z, p->left);
@@ -615,8 +632,8 @@ static symbol *generate_grouping_table(struct grouping * q) {
 }
 
 static int interpret_grouping(struct generator *g, struct SN_env *z, struct node *p, int complement) {
-    struct grouping * q = p->name->grouping;
     assert(p->mode == m_forward && "TODO: only forward mode is supported for now");
+    struct grouping * q = p->name->grouping;
     assert(g->options->encoding == ENC_SINGLEBYTE && "TODO: only single byte encoding supported for now");
     // TODO: This is extremely slow. In generator.c these tables are pre-generated at compile time.
     //
@@ -635,6 +652,7 @@ static int interpret_grouping(struct generator *g, struct SN_env *z, struct node
 
 static int interpret_setmark(struct generator *g, struct SN_env *z, struct node *p)
 {
+    assert(p->mode == m_forward && "TODO: only forward mode is supported for now");
     switch (p->name->type) {
     case t_integer: {
         int count = p->name->count;
@@ -657,6 +675,9 @@ static int interpret_setmark(struct generator *g, struct SN_env *z, struct node 
 
 static int interpret_backwards(struct generator *g, struct SN_env *z, struct node *p)
 {
+    assert(p->mode == m_backward);
+    assert(p->left->mode == m_backward);
+
     // // From the generator
     // writef(g, "~Mz->lb = z->c; z->c = z->l;~C~N", p);
     // generate(g, p->left);
@@ -664,15 +685,9 @@ static int interpret_backwards(struct generator *g, struct SN_env *z, struct nod
 
     z->lb = z->c;
     z->c = z->l;
-
-    // TODO: before implementing this we need to go through all the interpreters and make sure that they have
-    // assert(p->mode == m_forward) where necessary
-
-    tracef_node(g, p->left, "command of backwards\n");
-    assert(p->mode == m_backward);
-    assert(p->left->mode == m_backward);
-    assert(0 && "c_backwards");
-    return 0;
+    int ret = interpret_command(g, z, p->left);
+    z->c = z->lb;
+    return ret;
 }
 
 static int interpret_command(struct generator *g, struct SN_env *z, struct node *p) {
