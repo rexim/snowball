@@ -464,8 +464,6 @@ static int interpret_and(struct generator *g, struct SN_env *z, struct node *p) 
 }
 
 static int interpret_bra(struct generator *g, struct SN_env *z, struct node *p) {
-    assert(p->mode == m_forward && "TODO: only forward mode is supported for now");
-
     p = p->left;
     while (p) {
         int s = interpret_command(g, z, p);
@@ -476,9 +474,11 @@ static int interpret_bra(struct generator *g, struct SN_env *z, struct node *p) 
 }
 
 static int interpret_leftslice(struct SN_env *z, struct node *p) {
-    assert(p->mode == m_forward && "TODO: only forward mode is supported for now");
-
-    z->bra = z->c;
+    if (p->mode == m_forward) {
+        z->bra = z->c;
+    } else {
+        z->ket = z->c;
+    }
     return 1;
 }
 
@@ -579,7 +579,6 @@ static int interpret_hop(struct generator *g, struct SN_env *z, struct node *p) 
 }
 
 static int interpret_do(struct generator *g, struct SN_env *z, struct node *p) {
-    assert(p->mode == m_forward && "TODO: only forward mode is supported for now");
     int c = z->c;
     interpret_command(g, z, p->left);
     z->c = c;
@@ -673,8 +672,7 @@ static int interpret_setmark(struct generator *g, struct SN_env *z, struct node 
     return 0;
 }
 
-static int interpret_backwards(struct generator *g, struct SN_env *z, struct node *p)
-{
+static int interpret_backwards(struct generator *g, struct SN_env *z, struct node *p) {
     assert(p->mode == m_backward);
     assert(p->left->mode == m_backward);
 
@@ -688,6 +686,12 @@ static int interpret_backwards(struct generator *g, struct SN_env *z, struct nod
     int ret = interpret_command(g, z, p->left);
     z->c = z->lb;
     return ret;
+}
+
+static int interpret_try(struct generator *g, struct SN_env *z, struct node *p)
+{
+    interpret_command(g, z, p->left);
+    return 1;
 }
 
 static int interpret_command(struct generator *g, struct SN_env *z, struct node *p) {
@@ -718,6 +722,7 @@ static int interpret_command(struct generator *g, struct SN_env *z, struct node 
     case c_gopast:        return interpret_GO(g, z, p, 0);
     case c_setmark:       return interpret_setmark(g, z, p);
     case c_backwards:     return interpret_backwards(g, z, p);
+    case c_try:           return interpret_try(g, z, p);
     }
 
     tracef_node(g, p, "command is not interpreted yet\n");
