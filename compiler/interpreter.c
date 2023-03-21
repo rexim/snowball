@@ -758,6 +758,16 @@ static int interpret_try(struct generator *g, struct SN_env *z, struct node *p)
     return 1;
 }
 
+static int interpret_booltest(struct generator *g, struct SN_env *z, struct node *p)
+{
+    assert(p->name->type == t_boolean);
+    /* We use a single array for booleans and integers, with the
+     * integers first.
+     */
+    int count = p->name->count + g->analyser->name_count[t_integer];
+    return z->I[count];
+}
+
 static int interpret_command(struct generator *g, struct SN_env *z, struct node *p) {
     switch (p->type) {
     case c_repeat:        return interpret_repeat(g, z, p);
@@ -787,6 +797,7 @@ static int interpret_command(struct generator *g, struct SN_env *z, struct node 
     case c_setmark:       return interpret_setmark(g, z, p);
     case c_backwards:     return interpret_backwards(g, z, p);
     case c_try:           return interpret_try(g, z, p);
+    case c_booltest:      return interpret_booltest(g, z, p);
     }
 
     tracef_node(g, p, "command is not interpreted yet\n");
