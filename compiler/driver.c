@@ -534,7 +534,8 @@ extern int main(int argc, char * argv[]) {
 
                     // english.sbl
                     // const char *input = "skis";
-                    const char *input = "linear";
+                    // const char *input = "linear";
+                    const char *input = "linearly";
 
                     printf("INPUT:  %s\n", input);
                     z->p = add_s_to_b(z->p, input);

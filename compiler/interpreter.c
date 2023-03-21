@@ -544,9 +544,11 @@ static int interpret_leftslice(struct SN_env *z, struct node *p) {
 }
 
 static int interpret_rightslice(struct SN_env *z, struct node *p) {
-    assert(p->mode == m_forward && "TODO: only forward mode is supported for now");
-
-    z->ket = z->c;
+    if (p->mode == m_forward) {
+        z->ket = z->c;
+    } else {
+        z->bra = z->c;
+    }
     return 1;
 }
 
