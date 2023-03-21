@@ -207,6 +207,11 @@ extern void SN_close_env(struct SN_env *z, struct generator *g)
     free(z);
 }
 
+static int eq_s_b(struct SN_env * z, int s_size, const symbol * s) {
+    if (z->c - z->lb < s_size || memcmp(z->p + z->c - s_size, s, s_size * sizeof(symbol)) != 0) return 0;
+    z->c -= s_size; return 1;
+}
+
 static int eq_s(struct SN_env * z, int s_size, const symbol * s) {
     if (z->l - z->c < s_size || memcmp(z->p + z->c, s, s_size * sizeof(symbol)) != 0) return 0;
     z->c += s_size; return 1;
@@ -289,6 +294,64 @@ static int slice_from_s(struct SN_env * z, int s_size, const symbol * s) {
 
 static int slice_from_v(struct SN_env * z, const symbol * p) {
     return slice_from_s(z, SIZE(p), p);
+}
+
+/* find_among_b is for backwards processing. Same comments apply */
+
+static int find_among_b(struct SN_env * z, const struct amongvec * v, int v_size) {
+
+    int i = 0;
+    int j = v_size;
+
+    int c = z->c; int lb = z->lb;
+    const symbol * q = z->p + c - 1;
+
+    const struct amongvec * w;
+
+    int common_i = 0;
+    int common_j = 0;
+
+    int first_key_inspected = 0;
+
+    while (1) {
+        int k = i + ((j - i) >> 1);
+        int diff = 0;
+        int common = common_i < common_j ? common_i : common_j;
+        w = v + k;
+        {
+            int i2; for (i2 = w->size - 1 - common; i2 >= 0; i2--) {
+                if (c - common == lb) { diff = -1; break; }
+                diff = q[- common] - w->b[i2];
+                if (diff != 0) break;
+                common++;
+            }
+        }
+        if (diff < 0) { j = k; common_j = common; }
+                 else { i = k; common_i = common; }
+        if (j - i <= 1) {
+            if (i > 0) break;
+            if (j == i) break;
+            if (first_key_inspected) break;
+            first_key_inspected = 1;
+        }
+    }
+    while (1) {
+        w = v + i;
+        if (common_i >= w->size) {
+            z->c = c - w->size;
+            assert(w->function == 0 && "TODO: we don't really know what this function is used for yet");
+            if (w->function == 0) return w->result;
+#if 0
+            {
+                int res = w->function(z);
+                z->c = c - w->s_size;
+                if (res) return w->result;
+            }
+#endif
+        }
+        i = w->i;
+        if (i < 0) return 0;
+    }
 }
 
 static int find_among(struct SN_env * z, const struct amongvec * v, int v_size) {
@@ -436,8 +499,6 @@ static int interpret_repeat(struct generator *g, struct SN_env *z, struct node *
 }
 
 static int interpret_or(struct generator *g, struct SN_env *z, struct node *p) {
-    assert(p->mode == m_forward && "TODO: only forward mode is supported for now");
-
     p = p->left;
     while (p) {
         int c = z->c;
@@ -490,11 +551,10 @@ static int interpret_rightslice(struct SN_env *z, struct node *p) {
 }
 
 static int interpret_literalstring(struct SN_env *z, struct node *p) {
-    assert(p->mode == m_forward && "TODO: only forward mode is supported for now");
     // TODO: in the generator version there is also case when SIZE(b) == 1 for optimization reasons
     // Should we do the same in here too?
     symbol * b = p->literalstring;
-    return eq_s(z, SIZE(b), b);
+    return p->mode == m_forward ? eq_s(z, SIZE(b), b) : eq_s_b(z, SIZE(b), b);
 }
 
 static int interpret_slicefrom(struct SN_env *z, struct node *p) {
@@ -528,10 +588,14 @@ static int interpret_mathassign(struct generator *g, struct SN_env *z, struct no
 }
 
 static int interpret_substring(struct SN_env *z, struct node *p) {
-    assert(p->mode == m_forward && "TODO: only forward mode is supported for now");
     // TODO: The original generate_substring() had some sort of optimization. Is it applicable here?
     struct among * x = p->among;
-    int among_var = find_among(z, x->b, x->literalstring_count);
+    int among_var;
+    if (p->mode == m_forward) {
+        among_var = find_among(z, x->b, x->literalstring_count);
+    } else {
+        among_var = find_among_b(z, x->b, x->literalstring_count);
+    }
     // TODO: I'm not sure if this is the best solution since I have a limited understand of how amogus works
     if (x->amongvar_needed) z->among_var = among_var;
     return among_var;
