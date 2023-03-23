@@ -21,6 +21,8 @@
 ///
 /// Stuff that is useful while developing the interpreter but probably going to be removed after it's done.
 
+// TODO: printable_type_of_name and printable_type_of_node are duplication of stuff from analyser.c
+
 static const char *printable_type_of_name(int type)
 {
     switch (type) {
