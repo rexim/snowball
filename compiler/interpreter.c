@@ -446,6 +446,30 @@ static int in_grouping(struct SN_env * z, const symbol * s, int min, int max, in
     return 0;
 }
 
+static int in_grouping_b(struct SN_env * z, const symbol * s, int min, int max, int repeat) {
+    do {
+        int ch;
+        if (z->c <= z->lb) return -1;
+        ch = z->p[z->c - 1];
+        if (ch > max || (ch -= min) < 0 || (s[ch >> 3] & (0X1 << (ch & 0X7))) == 0)
+            return 1;
+        z->c--;
+    } while (repeat);
+    return 0;
+}
+
+static int out_grouping_b(struct SN_env * z, const symbol * s, int min, int max, int repeat) {
+    do {
+        int ch;
+        if (z->c <= z->lb) return -1;
+        ch = z->p[z->c - 1];
+        if (!(ch > max || (ch -= min) < 0 || (s[ch >> 3] & (0X1 << (ch & 0X7))) == 0))
+            return 1;
+        z->c--;
+    } while (repeat);
+    return 0;
+}
+
 /// Interpreter.
 /// Everything related to traversing the Snowball AST and actually interpreting it.
 
@@ -699,7 +723,6 @@ static symbol *generate_grouping_table(struct grouping * q) {
 }
 
 static int interpret_grouping(struct generator *g, struct SN_env *z, struct node *p, int complement) {
-    assert(p->mode == m_forward && "TODO: only forward mode is supported for now");
     struct grouping * q = p->name->grouping;
     assert(g->options->encoding == ENC_SINGLEBYTE && "TODO: only single byte encoding supported for now");
     // TODO: This is extremely slow. In generator.c these tables are pre-generated at compile time.
@@ -709,9 +732,17 @@ static int interpret_grouping(struct generator *g, struct SN_env *z, struct node
     symbol *map = generate_grouping_table(q);
     int ret;
     if (complement) {
-        ret = out_grouping(z, map, q->smallest_ch, q->largest_ch, 0);
+        if (p->mode == m_forward) {
+            ret = out_grouping(z, map, q->smallest_ch, q->largest_ch, 0);
+        } else {
+            ret = out_grouping_b(z, map, q->smallest_ch, q->largest_ch, 0);
+        }
     } else {
-        ret = in_grouping(z, map, q->smallest_ch, q->largest_ch, 0);
+        if (p->mode == m_forward) {
+            ret = in_grouping(z, map, q->smallest_ch, q->largest_ch, 0);
+        } else {
+            ret = in_grouping_b(z, map, q->smallest_ch, q->largest_ch, 0);
+        }
     }
     lose_b(map);
     return ret;
